@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 1. Добавляем расширение для UUID (если нужно uuid_generate_v4) -->
+    <!--    Этот шаг можно пропустить, если используется gen_random_uuid() или расширение уже есть -->
+    <changeSet id="27-02-2025-create-uuid-extension" author="EcoSharingTeam">
+        <sql>CREATE EXTENSION IF NOT EXISTS "uuid-ossp";</sql>
+        <rollback>DROP EXTENSION IF EXISTS "uuid-ossp";</rollback>
+        <comment>Создание расширения uuid-ossp, если оно отсутствует</comment>
+    </changeSet>
+
+    <!-- 2. Создание таблицы ролей (roles) -->
+    <changeSet id="27-02-2025-create-roles-table" author="EcoSharingTeam">
+        <createTable tableName="roles">
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+        </createTable>
+        <comment>Создание таблицы для хранения ролей пользователей</comment>
+        <rollback>
+            <dropTable tableName="roles"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 3. Создание таблицы учетных данных (user_credentials) -->
+    <changeSet id="27-02-2025-create-user-credentials-table" author="EcoSharingTeam">
+        <createTable tableName="user_credentials">
+            <column name="user_id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="password_hash" type="VARCHAR(100)">
+                <constraints nullable="false"/> <!-- Пароль обязателен -->
+            </column>
+            <column name="telegram_id" type="VARCHAR(50)">
+                <constraints nullable="true" unique="true"/>
+            </column>
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <!-- Создание уникального индекса для telegram_id (дополнительно к unique constraint) -->
+        <createIndex tableName="user_credentials" indexName="idx_usercredentials_telegram_id" unique="true">
+            <column name="telegram_id"/>
+        </createIndex>
+        <comment>Создание таблицы для хранения учетных данных пользователей и индекса для telegram_id</comment>
+        <rollback>
+            <dropIndex indexName="idx_usercredentials_telegram_id" tableName="user_credentials"/>
+            <dropTable tableName="user_credentials"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 4. Создание таблицы refresh токенов (refresh_tokens) -->
+    <changeSet id="27-02-2025-create-refresh-tokens-table" author="EcoSharingTeam">
+        <createTable tableName="refresh_tokens">
+            <column name="id" type="UUID" defaultValueComputed="uuid_generate_v4()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="token" type="VARCHAR(1024)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="expiry_date" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <!-- Создание уникального индекса для token -->
+        <createIndex tableName="refresh_tokens" indexName="idx_refreshtoken_token" unique="true">
+            <column name="token"/>
+        </createIndex>
+        <!-- Создание индекса для user_id для быстрого поиска/удаления -->
+        <createIndex tableName="refresh_tokens" indexName="idx_refreshtoken_user_id">
+            <column name="user_id"/>
+        </createIndex>
+        <comment>Создание таблицы для хранения refresh токенов и индексов</comment>
+        <rollback>
+            <dropIndex indexName="idx_refreshtoken_user_id" tableName="refresh_tokens"/>
+            <dropIndex indexName="idx_refreshtoken_token" tableName="refresh_tokens"/>
+            <dropTable tableName="refresh_tokens"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 5. Создание связующей таблицы Пользователь-Роль (user_credential_roles) -->
+    <changeSet id="27-02-2025-create-user-credential-roles-table" author="EcoSharingTeam">
+        <createTable tableName="user_credential_roles">
+            <column name="user_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="role_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <!-- Добавляем составной PK отдельно -->
+        <addPrimaryKey tableName="user_credential_roles" columnNames="user_id, role_id" constraintName="pk_user_credential_roles"/>
+        <comment>Создание связующей таблицы пользователь-роль</comment>
+        <rollback>
+            <dropPrimaryKey tableName="user_credential_roles" constraintName="pk_user_credential_roles"/>
+            <dropTable tableName="user_credential_roles"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 6. Добавление внешних ключей (лучше делать после создания всех таблиц) -->
+    <changeSet id="27-02-2025-add-foreign-keys" author="EcoSharingTeam">
+        <addForeignKeyConstraint baseTableName="refresh_tokens" baseColumnNames="user_id"
+                                 constraintName="fk_refreshtoken_usercred"
+                                 referencedTableName="user_credentials" referencedColumnNames="user_id"
+                                 onDelete="CASCADE"/> <!-- Удалять токены при удалении учетных данных -->
+
+        <addForeignKeyConstraint baseTableName="user_credential_roles" baseColumnNames="user_id"
+                                 constraintName="fk_usercredroles_usercred"
+                                 referencedTableName="user_credentials" referencedColumnNames="user_id"
+                                 onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint baseTableName="user_credential_roles" baseColumnNames="role_id"
+                                 constraintName="fk_usercredroles_role"
+                                 referencedTableName="roles" referencedColumnNames="id"
+                                 onDelete="RESTRICT"/>
+        <comment>Добавление внешних ключей</comment>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="user_credential_roles" constraintName="fk_usercredroles_role"/>
+            <dropForeignKeyConstraint baseTableName="user_credential_roles" constraintName="fk_usercredroles_usercred"/>
+            <dropForeignKeyConstraint baseTableName="refresh_tokens" constraintName="fk_refreshtoken_usercred"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 7. Вставка начальных ролей (UUID генерируется базой данных) -->
+    <changeSet id="27-02-2025-insert-initial-roles" author="EcoSharingTeam">
+        <insert tableName="roles">
+            <column name="id" valueComputed="gen_random_uuid()"/>
+            <column name="name" value="ROLE_USER"/>
+        </insert>
+        <insert tableName="roles">
+            <column name="id" valueComputed="gen_random_uuid()"/>
+            <column name="name" value="ROLE_ADMIN"/>
+        </insert>
+        <insert tableName="roles">
+            <column name="id" valueComputed="gen_random_uuid()"/>
+            <column name="name" value="ROLE_MODERATOR"/>
+        </insert>
+        <comment>Вставка стандартных ролей (USER, ADMIN, MODERATOR)</comment>
+        <rollback>
+            <delete tableName="roles">
+                <where>name IN ('ROLE_USER', 'ROLE_ADMIN', 'ROLE_MODERATOR')</where>
+            </delete>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
