@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.6.xsd">
+
+    <!-- 1. Включаем расширение UUID, если его нет -->
+    <changeSet id="27-02-2025-create-uuid-extension" author="Rusya235">
+        <sql>CREATE EXTENSION IF NOT EXISTS "uuid-ossp";</sql>
+        <rollback>DROP EXTENSION IF EXISTS "uuid-ossp";</rollback>
+    </changeSet>
+
+    <!-- 2. Таблица профилей пользователей -->
+    <changeSet id="27-02-2025-create-user-profiles-table" author="Rusya235">
+        <createTable tableName="user_profiles">
+            <column name="user_id" type="uuid"> <!-- Используем user_id как PK -->
+                <constraints nullable="false" primaryKey="true"/>
+            </column>
+            <column name="username" type="varchar(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="email" type="varchar(100)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="first_name" type="varchar(100)"/>
+            <column name="last_name" type="varchar(100)"/>
+            <column name="phone" type="varchar(20)"/>
+            <column name="about" type="text"/>
+            <column name="avatar_url" type="varchar(255)"/>
+            <!-- Поле location из твоего примера -->
+            <column name="location" type="varchar(255)"/>
+            <!-- Поле birthDate из твоего примера -->
+            <column name="birth_date" type="date"/>
+            <column name="rating" type="decimal(3,2)" defaultValueNumeric="0.0">
+                <constraints nullable="false"/>
+            </column>
+            <!-- Поля статистики из твоего примера -->
+            <column name="ratings_count" type="int" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="listings_count" type="int" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="rentals_count" type="int" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_login_at" type="timestamp"/> <!-- Время последнего входа -->
+        </createTable>
+
+        <!-- Индексы для user_profiles -->
+        <createIndex tableName="user_profiles" indexName="idx_userprofile_username">
+            <column name="username"/>
+        </createIndex>
+        <createIndex tableName="user_profiles" indexName="idx_userprofile_email">
+            <column name="email"/>
+        </createIndex>
+        <createIndex tableName="user_profiles" indexName="idx_userprofile_is_active">
+            <column name="is_active"/>
+        </createIndex>
+
+        <rollback>
+            <dropIndex indexName="idx_userprofile_is_active" tableName="user_profiles"/>
+            <dropIndex indexName="idx_userprofile_email" tableName="user_profiles"/>
+            <dropIndex indexName="idx_userprofile_username" tableName="user_profiles"/>
+            <dropTable tableName="user_profiles"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 3. Таблица настроек пользователей -->
+    <changeSet id="27-02-2025-create-user-settings-table" author="Rusya235">
+        <createTable tableName="user_settings">
+            <column name="user_id" type="uuid"> <!-- PK и FK одновременно -->
+                <constraints nullable="false" primaryKey="true"/>
+            </column>
+            <!-- Поля настроек -->
+            <column name="enable_email_notifications" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="enable_telegram_notifications" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="language" type="varchar(5)" defaultValue="ru"> <!-- Код языка (ru, en) -->
+                <constraints nullable="false"/>
+            </column>
+            <!-- Поле timezone из твоего примера -->
+            <column name="timezone" type="varchar(50)" defaultValue="UTC">
+                <constraints nullable="true"/>
+            </column>
+            <!-- Добавь другие поля настроек, если нужно (например, приватность) -->
+            <!-- Можно использовать JSONB для гибкости, но отдельная таблица чище для простых настроек -->
+        </createTable>
+
+        <!-- Внешний ключ на user_profiles -->
+        <addForeignKeyConstraint baseTableName="user_settings" baseColumnNames="user_id"
+                                 constraintName="fk_usersettings_userprofile"
+                                 referencedTableName="user_profiles" referencedColumnNames="user_id"
+                                 onDelete="CASCADE"/> <!-- Удалять настройки при удалении профиля -->
+
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="user_settings" constraintName="fk_usersettings_userprofile"/>
+            <dropTable tableName="user_settings"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
