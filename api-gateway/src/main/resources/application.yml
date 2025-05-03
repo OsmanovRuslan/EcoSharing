@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: auth-service
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/auth/**
+        - id: telegram-bot-service
+          uri: lb://telegram-bot-service
+          predicates:
+            - Path=/api/telegram/**
+        - id: telegram-webhook-gateway
+          uri: lb://telegram-webhook-gateway
+          predicates:
+            - Path=/api/webhook/**
+        - id: user-service
+          uri: lb://user-service
+          predicates:
+            - Path=/api/users/**,/api/admin/users/**
+        - id: listing-service
+          uri: lb://listing-service
+          predicates:
+            - Path=/api/listings/**,/api/categories/**
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/notifications/**
+
+server:
+  port: 7777
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
