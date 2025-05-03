@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: telegram-bot-service
+
+  kafka:
+    consumer:
+      group-id: telegram-bot-service
+      bootstrap-servers: localhost:9092,localhost:9094,localhost:9096
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: org.telegram.telegrambots.meta.api.objects,java.util,java.lang,ru.ecosharing.*
+        spring.json.fail.on.unknown.properties: false # Игнорировать неизвестные поля JSON
+
+bot:
+  token: ${BOT_TOKEN}
+  username: ${BOT_USERNAME}
+  webhook-path: /api/webhook/webhook
+  max-connections: 40
+  drop-pending-updates: true
+  mini-app-url: ${BOT_MINI_APP_URL}
+  secret-token: ${BOT_WEBHOOK_SECRET_TOKEN}
+
+kafka:
+  topic: telegram-updates
+
+app:
+  base-url: ${APP_BASE_URL}
+  webhook-url: ${app.base-url}${bot.webhook-path}
+
+server:
+  port: 0
+
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance: localhost
+
+# Настройка логирования
+logging:
+  level:
+    ru.ecosharing: DEBUG
+    org.springframework.web: INFO
+    org.telegram.telegrambots: INFO
