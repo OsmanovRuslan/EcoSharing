@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: telegram-webhook-gateway
+
+  kafka:
+    bootstrap-servers: localhost:9092,localhost:9094,localhost:9096
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        linger.ms: 0
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+
+server:
+  port: 0
+
+bot:
+  token: ${BOT_TOKEN}
+  max-connections: 40
+  drop-pending-updates: true
+  webhook-path: /api/webhook/webhook
+  secret-token: ${BOT_WEBHOOK_SECRET_TOKEN}
+
+app:
+  base-url: ${APP_BASE_URL}
+  webhook-url: ${app.base-url}${bot.webhook-path}
+
+telegram:
+  kafka:
+    topic: telegram-updates
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+logging:
+  level:
+    # Установи корневой уровень на INFO
+    root: INFO
+    # Установи уровень для твоих пакетов (можно DEBUG для большей детализации)
+    ru.ecosharing: DEBUG
+    # Уровни для Spring, Kafka, Telegram (полезно для отладки)
+    org.springframework: INFO # или WARN, если слишком много логов Spring
+    org.apache.kafka: INFO    # или WARN
+    org.telegram.telegrambots: DEBUG # Чтобы видеть детальные логи библиотеки
