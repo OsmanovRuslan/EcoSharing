@@ -1,0 +1,84 @@
+spring:
+  application:
+    name: notification-service
+
+  # --- Настройки Async ---
+  task:
+    execution:
+      pool:
+        core-size: 5      # Базовое количество потоков
+        max-size: 15      # Максимальное количество потоков
+        queue-capacity: 200 # Размер очереди задач
+      thread-name-prefix: notif-async- # Префикс для имен потоков
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+    # --- Kafka ---
+    kafka:
+      bootstrap-servers: localhost:9092,localhost:9094,localhost:9096
+      consumer:
+        group-id: notification-service-group
+        key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+        properties:
+          spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+          spring.json.trusted.packages: ru.ecosharing.*,java.util,java.lang,org.telegram.telegrambots.meta.api.objects
+          spring.json.value.default.type: ru.ecosharing.notification_service.dto.NotificationRequestKafkaDto # Класс DTO по умолчанию
+          spring.json.fail.on.unknown.properties: false # Игнорировать неизвестные поля JSON
+        auto-offset-reset: earliest # Поведение при отсутствии сохраненного offset'а
+
+      producer:
+        key-serializer: org.apache.kafka.common.serialization.StringSerializer
+        value-serializer: org.springframework.kafka.support.serializer.JsonSerializer # Сериализуем в JSON
+        acks: all
+        properties:
+          linger.ms: 0
+          enable.idempotence: true
+          max.in.flight.requests.per.connection: 5
+
+
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    enabled: true
+
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    protocol: smtp
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
+# --- Настройки приложения (префикс app) ---
+app:
+  mail:
+    from: ${APP_MAIL_FROM}
+    sender-name: ${APP_MAIL_SENDER_NAME:EcoSharing Team}
+  telegram:
+    webapp-url: ${APP_TELEGRAM_WEBAPP_URL}
+
+kafka:
+  topic:
+    notification-requests: notification-requests    # Топик для получения запросов
+    telegram-send-requests: telegram-send-requests # Топик для отправки команд боту
+
+
+server:
+  port: 0
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/

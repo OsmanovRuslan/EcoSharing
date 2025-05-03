@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 1. Включаем расширение UUID, если его нет -->
+    <changeSet id="27-02-2025-notif-create-uuid-extension" author="EcoSharingTeam">
+        <sql>CREATE EXTENSION IF NOT EXISTS "uuid-ossp";</sql>
+        <rollback>DROP EXTENSION IF EXISTS "uuid-ossp";</rollback>
+        <comment>Создание расширения uuid-ossp, если оно отсутствует</comment>
+    </changeSet>
+
+    <!-- 2. Таблица уведомлений пользователей -->
+    <changeSet id="27-02-2025-create-user-notifications-table" author="EcoSharingTeam">
+        <createTable tableName="user_notifications">
+            <column name="id" type="UUID" defaultValueComputed="uuid_generate_v4()">
+                <constraints nullable="false" primaryKey="true"/>
+            </column>
+            <column name="user_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="notification_type" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="channel" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="subject" type="VARCHAR(255)"/>
+            <column name="message" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <!-- Используем JSONB для параметров в PostgreSQL -->
+            <column name="params" type="JSONB"/>
+            <column name="target_url" type="VARCHAR(512)"/>
+            <column name="is_read" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="read_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+
+        <!-- Индексы -->
+        <createIndex tableName="user_notifications" indexName="idx_usernotif_user_read_created">
+            <column name="user_id"/>
+            <column name="is_read"/>
+            <column name="created_at" descending="true"/> <!-- Добавляем DESC для сортировки -->
+        </createIndex>
+        <createIndex tableName="user_notifications" indexName="idx_usernotif_created_at">
+            <column name="created_at"/>
+        </createIndex>
+
+        <rollback>
+            <dropIndex indexName="idx_usernotif_created_at" tableName="user_notifications"/>
+            <dropIndex indexName="idx_usernotif_user_read_created" tableName="user_notifications"/>
+            <dropTable tableName="user_notifications"/>
+        </rollback>
+        <comment>Создание таблицы для хранения уведомлений пользователей</comment>
+    </changeSet>
+
+</databaseChangeLog>
