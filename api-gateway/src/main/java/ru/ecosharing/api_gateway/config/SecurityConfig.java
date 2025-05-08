@@ -36,8 +36,8 @@ public class SecurityConfig {
         CorsConfiguration corsConfig = new CorsConfiguration();
         corsConfig.setAllowedOrigins(Arrays.asList(
                 "https://web.telegram.org",
-                "https://8902-194-71-107-194.ngrok-free.app",
-                "https://b9bb-194-71-107-194.ngrok-free.app"
+                "https://5403-151-236-4-154.ngrok-free.app",
+                "https://6fbe-5-180-114-31.ngrok-free.app"
         ));
         corsConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         corsConfig.setAllowedHeaders(List.of("*", "ngrok-skip-browser-warning"));

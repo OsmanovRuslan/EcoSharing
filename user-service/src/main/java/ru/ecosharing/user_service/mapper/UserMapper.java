@@ -15,7 +15,8 @@ import java.util.stream.Collectors;
  */
 public final class UserMapper {
 
-    private UserMapper() {} // Приватный конструктор
+    private UserMapper() {
+    } // Приватный конструктор
 
     // --- Мапперы для UserProfile и UserSettings ---
 
@@ -99,9 +100,9 @@ public final class UserMapper {
                 .isActive(true)
                 .rating(new BigDecimal("0.0"))
                 .build();
+
         // Создаем и связываем настройки по умолчанию
         UserSettings settings = UserSettings.builder()
-                .userId(request.getUserId())
                 .enableEmailNotifications(true)
                 .enableTelegramNotifications(true)
                 .language("ru")
