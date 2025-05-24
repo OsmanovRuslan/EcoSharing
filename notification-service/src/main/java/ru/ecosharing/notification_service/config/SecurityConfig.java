@@ -1,83 +1,70 @@
-package ru.ecosharing.notification_service.config;
+package ru.ecosharing.notification_service.config; // Убедись, что пакет правильный
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod; // Для разрешения OPTIONS
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity; // Для @PreAuthorize
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.http.HttpMethod; // Для разрешений по методам
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity; // Используем HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer; // Для disable()
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer; // Для отключения csrf
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import ru.ecosharing.notification_service.security.JwtAuthenticationEntryPoint; // Точка входа для ошибок 401
-import ru.ecosharing.notification_service.security.JwtAuthenticationFilter;     // Фильтр для JWT
-import ru.ecosharing.notification_service.security.JwtTokenProvider;        // Для создания фильтра
+// Импортируем фильтр и точку входа для Servlet API
+import ru.ecosharing.notification_service.security.JwtAuthenticationEntryPoint;
+import ru.ecosharing.notification_service.security.JwtAuthenticationFilter;
+import ru.ecosharing.notification_service.security.JwtTokenProvider;
 
 /**
- * Конфигурация безопасности Spring Security для Notification Service.
- * Настраивает stateless аутентификацию по JWT для API фронтенда
- * и определяет правила доступа к эндпоинтам.
+ * Конфигурация безопасности Spring Security для Notification Service (на базе Spring MVC).
  */
 @Configuration
-@EnableWebSecurity // Включает веб-безопасность Spring Security
-@EnableMethodSecurity(prePostEnabled = true, securedEnabled = true) // Включает аннотации @PreAuthorize
-@RequiredArgsConstructor // Внедрение зависимостей через конструктор
+@EnableWebSecurity // Включает веб-безопасность для Servlet стека
+@EnableMethodSecurity(prePostEnabled = true, securedEnabled = true) // Для @PreAuthorize
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint; // Обработчик 401
-    private final JwtTokenProvider jwtTokenProvider; // Провайдер для создания фильтра
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+    private final JwtTokenProvider jwtTokenProvider;
 
     /**
-     * Создает бин фильтра JWT аутентификации.
+     * Бин для нашего кастомного JWT фильтра.
      */
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() {
-        return new JwtAuthenticationFilter(jwtTokenProvider);
+        return new JwtAuthenticationFilter(jwtTokenProvider); // Предполагаем, что этот фильтр подходит для Servlet API
     }
 
     /**
-     * Настраивает цепочку фильтров безопасности HTTP.
+     * Настраивает цепочку фильтров безопасности и правила доступа для HTTP запросов.
      */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // 1. Отключаем CSRF (не нужен для stateless API)
-                .csrf(AbstractHttpConfigurer::disable)
-                // 2. Отключаем стандартную обработку CORS в этом сервисе!
-                //    Предполагается, что CORS полностью управляется API Gateway.
-                .cors(AbstractHttpConfigurer::disable)
-                // 3. Настраиваем обработку ошибок аутентификации
+                .csrf(AbstractHttpConfigurer::disable) // Отключаем CSRF
+                // CORS теперь будет управляться API Gateway, здесь не настраиваем или разрешаем всё для простоты, если шлюз всё равно фильтрует
+                // .cors(Customizer.withDefaults()) // Или настроить через CorsConfigurationSource бин
                 .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(jwtAuthenticationEntryPoint) // Кастомный ответ 401
+                        .authenticationEntryPoint(jwtAuthenticationEntryPoint) // Обработка 401
                 )
-                // 4. Устанавливаем политику управления сессиями на STATELESS
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // Stateless приложение
                 )
-                // 5. Настраиваем правила авторизации запросов
                 .authorizeHttpRequests(auth -> auth
-                        // Разрешаем preflight запросы OPTIONS для всех путей (важно для CORS через шлюз)
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        // Разрешаем доступ к эндпоинтам Actuator (для мониторинга)
-                        .requestMatchers("/actuator/**").permitAll()
-                        // Все остальные запросы к API уведомлений (/api/notifications/**)
-                        // требуют аутентификации. Конкретные права (например, что пользователь
-                        // может читать только свои уведомления) проверяются в контроллере/сервисе
-                        // с использованием @PreAuthorize или вручную через SecurityContext.
-                        .requestMatchers("/api/notifications/**").authenticated()
-                        // Все остальные запросы (если они есть) также требуют аутентификации
-                        .anyRequest().authenticated()
+                                // Эндпоинт для Kafka Consumer'а не должен быть доступен извне,
+                                // он не является HTTP эндпоинтом.
+                                // Эндпоинт для SSE удален.
+                                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // Разрешаем OPTIONS для CORS preflight
+                                .requestMatchers("/api/notifications/my/**").authenticated() // API для фронта требует аутентификации
+                                .requestMatchers("/actuator/**").permitAll() // Actuator
+                                .anyRequest().denyAll() // Все остальные запросы запрещены по умолчанию
+                        // (если есть другие эндпоинты, их нужно явно разрешить)
                 );
 
-        // 6. Добавляем наш фильтр JWT перед стандартным фильтром Spring
+        // Добавляем наш JWT фильтр перед стандартным фильтром Spring
         http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
-
-    // AuthenticationManager и PasswordEncoder здесь не нужны,
-    // так как сервис не выполняет аутентификацию по паролю.
-    // Валидация токена происходит в JwtAuthenticationFilter.
 }

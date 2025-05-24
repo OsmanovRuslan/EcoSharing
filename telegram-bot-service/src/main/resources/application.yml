@@ -23,7 +23,9 @@ bot:
   secret-token: ${BOT_WEBHOOK_SECRET_TOKEN}
 
 kafka:
-  topic: telegram-updates
+  topic:
+    telegram-updates: telegram-updates
+    telegram-send-requests: telegram-send-requests
 
 app:
   base-url: ${APP_BASE_URL}

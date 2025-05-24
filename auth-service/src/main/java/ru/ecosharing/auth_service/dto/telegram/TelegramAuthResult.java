@@ -4,7 +4,7 @@ package ru.ecosharing.auth_service.dto.telegram;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import ru.ecosharing.auth_service.dto.enumeration.TelegramAuthStatus;
+import ru.ecosharing.auth_service.dto.enums.TelegramAuthStatus;
 import ru.ecosharing.auth_service.dto.response.JwtResponse;
 
 /**

@@ -10,6 +10,7 @@ import ru.ecosharing.user_service.dto.request.AvailabilityCheckRequest;
 import ru.ecosharing.user_service.dto.request.CreateUserProfileRequest;
 import ru.ecosharing.user_service.dto.response.AvailabilityCheckResponse;
 import ru.ecosharing.user_service.dto.response.UserCredentialsResponse;
+import ru.ecosharing.user_service.dto.response.UserNotificationDetailsDto;
 import ru.ecosharing.user_service.service.UserService;
 
 import java.util.UUID;
@@ -25,8 +26,6 @@ import java.util.UUID;
 public class UserInternalController {
 
     private final UserService userService;
-
-    // ВАЖНО: Эти эндпоинты должны быть защищены в реальном приложении!
 
     /**
      * Эндпоинт для создания профиля пользователя (вызывается Auth Service).
@@ -68,5 +67,16 @@ public class UserInternalController {
         return ResponseEntity.ok(response);
     }
 
-    // Эндпоинт /api/internal/users/{userId}/notification-details удален
+    /**
+     * Внутренний эндпоинт для получения данных пользователя, необходимых Notification Service.
+     * Вызывается из Notification Service.
+     * @param userId ID пользователя.
+     * @return ResponseEntity с UserNotificationDetailsDto.
+     */
+    @GetMapping("/users/{userId}/notification-details")
+    public ResponseEntity<UserNotificationDetailsDto> getUserNotificationDetailsInternal(@PathVariable UUID userId) {
+        log.debug("GET /api/internal/users/{}/notification-details - Внутренний запрос данных для уведомлений", userId);
+        UserNotificationDetailsDto responseDto = userService.getUserNotificationDetails(userId);
+        return ResponseEntity.ok(responseDto);
+    }
 }

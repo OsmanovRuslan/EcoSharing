@@ -27,7 +27,7 @@ spring:
         - id: listing-service
           uri: lb://listing-service
           predicates:
-            - Path=/api/listings/**,/api/categories/**
+            - Path=/api/listings/**,/api/categories/**,/api/moderation/listings/**
         - id: notification-service
           uri: lb://notification-service
           predicates:

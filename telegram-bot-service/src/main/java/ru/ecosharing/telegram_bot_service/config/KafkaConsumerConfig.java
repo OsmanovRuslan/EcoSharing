@@ -15,6 +15,7 @@ import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer; // Используем ErrorHandlingDeserializer
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import ru.ecosharing.telegram_bot_service.dto.TelegramSendMessageKafkaDto;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -52,7 +53,6 @@ public class KafkaConsumerConfig {
         props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, "false"); // Не используем заголовки типов Kafka
 
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        // props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true"); // По умолчанию true
 
         return new DefaultKafkaConsumerFactory<>(props); // Не указываем десериализаторы явно, они в props
     }
@@ -66,13 +66,39 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, Update> kafkaListenerContainerFactory(
+    public ConcurrentKafkaListenerContainerFactory<String, Update> updateKafkaListenerContainerFactory(
             ConsumerFactory<String, Update> consumerFactory,
             CommonErrorHandler errorHandler) { // Инжектим зависимости
         ConcurrentKafkaListenerContainerFactory<String, Update> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
         factory.setCommonErrorHandler(errorHandler); // Устанавливаем обработчик ошибок
+        return factory;
+    }
+
+    @Bean
+    public ConsumerFactory<String, TelegramSendMessageKafkaDto> telegramSendCommandConsumerFactory() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId); // Может быть та же группа
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
+        props.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, JsonDeserializer.class.getName());
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, trustedPackages + ",ru.ecosharing.telegram_bot_service.dto.kafka");
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, TelegramSendMessageKafkaDto.class.getName());
+        props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, "false");
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        return new DefaultKafkaConsumerFactory<>(props);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, TelegramSendMessageKafkaDto> telegramSendCommandKafkaListenerContainerFactory(
+            ConsumerFactory<String, TelegramSendMessageKafkaDto> telegramSendCommandConsumerFactory,
+            CommonErrorHandler errorHandler) {
+        ConcurrentKafkaListenerContainerFactory<String, TelegramSendMessageKafkaDto> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(telegramSendCommandConsumerFactory);
+        factory.setCommonErrorHandler(errorHandler);
         return factory;
     }
 }

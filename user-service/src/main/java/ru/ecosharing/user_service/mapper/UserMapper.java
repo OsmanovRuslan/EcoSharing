@@ -111,5 +111,23 @@ public final class UserMapper {
         return profile;
     }
 
-    // --- Мапперы для UserAddress удалены ---
+    /**
+     * Преобразует UserProfile и UserSettings в UserNotificationDetailsDto.
+     * @param profile Сущность профиля.
+     * @param settings Сущность настроек.
+     * @return DTO с данными для уведомлений или null, если один из аргументов null.
+     */
+    public static UserNotificationDetailsDto toUserNotificationDetailsDto(UserProfile profile, UserSettings settings) {
+        if (profile == null || settings == null) {
+            return null;
+        }
+        return UserNotificationDetailsDto.builder()
+                .userId(profile.getUserId())
+                .email(profile.getEmail())
+                .firstName(profile.getFirstName())
+                .language(settings.getLanguage())
+                .emailNotificationsEnabled(settings.isEnableEmailNotifications())
+                .telegramNotificationsEnabled(settings.isEnableTelegramNotifications())
+                .build();
+    }
 }

@@ -20,7 +20,7 @@ public class TelegramUpdateConsumer {
 
     private final EcoSharingBot ecoSharingBot;
 
-    @KafkaListener(topics = "${kafka.topic}", groupId = "${spring.kafka.consumer.group-id}")
+    @KafkaListener(topics = "${kafka.topic.telegram-updates}", groupId = "${spring.kafka.consumer.group-id}", containerFactory = "updateKafkaListenerContainerFactory")
     public void consume(
             @Payload(required = false) Update update,
             ConsumerRecord<String, Update> record
@@ -29,7 +29,6 @@ public class TelegramUpdateConsumer {
         // Проверяем, не было ли ошибки десериализации (ErrorHandlingDeserializer вернет null)
         if (update == null) {
             log.error("Received null update from Kafka (deserialization error?). Record: {}", record);
-            // acknowledgment.acknowledge(); // Подтверждаем смещение, чтобы не пытаться обработать снова
             return;
         }
 

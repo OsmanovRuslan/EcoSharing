@@ -4,6 +4,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import ru.ecosharing.notification_service.config.FeignClientConfig;
 import ru.ecosharing.notification_service.dto.UserNotificationDetailsDto;
 
 import java.util.UUID;
@@ -13,7 +14,7 @@ import java.util.UUID;
  * Имя 'user-service' должно совпадать с `spring.application.name` сервиса пользователей
  * и быть зарегистрировано в Eureka (или указан явный URL).
  */
-@FeignClient(name = "user-service")
+@FeignClient(name = "user-service", configuration = FeignClientConfig.class)
 public interface UserServiceClient {
 
     /**
@@ -26,6 +27,6 @@ public interface UserServiceClient {
      *         404 Not Found, если пользователь не найден, или другие ошибки (5xx).
      */
     @GetMapping("/api/internal/users/{userId}/notification-details")
-    ResponseEntity<UserNotificationDetailsDto> getUserNotificationDetails(@PathVariable("userId") UUID userId);
+    UserNotificationDetailsDto getUserNotificationDetails(@PathVariable("userId") UUID userId);
 
 }

@@ -88,7 +88,6 @@ public class EcoSharingBot extends SpringWebhookBot {
         if (update.hasCallbackQuery() && update.getCallbackQuery().getMessage() != null) return update.getCallbackQuery().getMessage().getChatId();
         if (update.hasChannelPost()) return update.getChannelPost().getChatId();
         if (update.hasEditedChannelPost()) return update.getEditedChannelPost().getChatId();
-        // Добавить другие типы по необходимости
         return null;
     }
 

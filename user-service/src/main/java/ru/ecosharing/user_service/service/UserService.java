@@ -36,6 +36,8 @@ public interface UserService {
     UserSettingsResponse getUserSettingsAdmin(UUID userId);
     UserProfileResponse updateUserProfileAdmin(UUID userId, AdminUpdateUserRequest request);
 
+    UserNotificationDetailsDto getUserNotificationDetails(UUID userId);
+
     /**
      * Физически удаляет пользователя и связанные с ним данные (профиль, настройки).
      * ВНИМАНИЕ: Необратимая операция! Использовать с осторожностью.

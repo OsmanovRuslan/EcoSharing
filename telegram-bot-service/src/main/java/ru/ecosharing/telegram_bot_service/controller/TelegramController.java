@@ -6,7 +6,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import org.telegram.telegrambots.meta.api.objects.WebhookInfo;
-import ru.ecosharing.telegram_bot_service.service.NotificationService;
 import ru.ecosharing.telegram_bot_service.service.TelegramBotService;
 import ru.ecosharing.telegram_bot_service.dto.CreateInvoiceRequest;
 import ru.ecosharing.telegram_bot_service.dto.NotificationRequest;
@@ -22,31 +21,6 @@ import java.util.Map;
 public class TelegramController {
 
     private final TelegramBotService telegramBotService;
-    private final NotificationService notificationService;
-
-    @PostMapping("/notify")
-    public ResponseEntity<Boolean> sendNotification(@RequestBody NotificationRequest request) {
-        log.info("Received notification request for chat {}: Type: {}, AttachApp: {}",
-                request.getChatId(), request.getNotificationType(), request.isAttachWebAppButton());
-        if (request.getChatId() == null || request.getNotificationType() == null) {
-            log.warn("Invalid notification request: chatId or notificationType is null");
-            return ResponseEntity.badRequest().body(false);
-        }
-        boolean result = notificationService.sendNotification(
-                request.getChatId(), request.getNotificationType(), request.getParams(), request.isAttachWebAppButton());
-        return ResponseEntity.ok(result);
-    }
-
-    @PostMapping("/notify/user/{userId}")
-    public ResponseEntity<Boolean> sendNotificationByUserId(@PathVariable String userId, @RequestBody NotificationRequest request) {
-        log.info("Received notification request for user ID {}: Type: {}", userId, request.getNotificationType());
-        if (userId == null || userId.isEmpty() || request.getNotificationType() == null) {
-            log.warn("Invalid notification request: userId or notificationType is null/empty");
-            return ResponseEntity.badRequest().body(false);
-        }
-        boolean result = notificationService.sendNotificationByUserId(userId, request.getNotificationType(), request.getParams());
-        return ResponseEntity.ok(result);
-    }
 
     /**
      * Создает ссылку на оплату (invoice slug) через Telegram API.

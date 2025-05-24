@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="02-create-uuid-extension-listings" author="Rusya235">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <sqlCheck expectedResult="1">
+                    SELECT count(*) FROM pg_extension WHERE extname = 'uuid-ossp';
+                </sqlCheck>
+            </not>
+        </preConditions>
+        <sql>CREATE EXTENSION IF NOT EXISTS "uuid-ossp";</sql>
+        <rollback>DROP EXTENSION IF EXISTS "uuid-ossp";</rollback>
+        <comment>Ensure uuid-ossp extension exists for listings</comment>
+    </changeSet>
+
+    <changeSet id="02-create-listings-table" author="Rusya235">
+        <createTable tableName="listings">
+            <column name="id" type="UUID" defaultValueComputed="uuid_generate_v4()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="title" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="category_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="main_image_url" type="VARCHAR(512)"/>
+            <column name="location_text" type="VARCHAR(512)"/>
+            <column name="price" type="DECIMAL(19, 4)"/>
+            <column name="currency" type="VARCHAR(3)"/>
+            <column name="price_type" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="moderation_status" type="VARCHAR(30)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="availability_status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="moderation_comment" type="TEXT"/>
+            <column name="rejection_reason" type="TEXT"/>
+            <column name="view_count" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_moderated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+
+        <addForeignKeyConstraint baseTableName="listings"
+                                 baseColumnNames="category_id"
+                                 constraintName="fk_listing_category"
+                                 referencedTableName="categories"
+                                 referencedColumnNames="id"
+                                 onDelete="RESTRICT"/> <!-- Запретить удаление категории, если на нее есть объявления -->
+
+        <createIndex tableName="listings" indexName="idx_listing_user_id">
+            <column name="user_id"/>
+        </createIndex>
+        <createIndex tableName="listings" indexName="idx_listing_category_id">
+            <column name="category_id"/>
+        </createIndex>
+        <createIndex tableName="listings" indexName="idx_listing_moderation_status">
+            <column name="moderation_status"/>
+        </createIndex>
+        <createIndex tableName="listings" indexName="idx_listing_availability_status">
+            <column name="availability_status"/>
+        </createIndex>
+        <createIndex tableName="listings" indexName="idx_listing_price">
+            <column name="price"/>
+        </createIndex>
+        <createIndex tableName="listings" indexName="idx_listing_location_text">
+            <column name="location_text"/>
+        </createIndex>
+        <createIndex tableName="listings" indexName="idx_listing_created_at">
+            <column name="created_at"/>
+        </createIndex>
+
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="listings" constraintName="fk_listing_category"/>
+            <dropTable tableName="listings"/>
+        </rollback>
+        <comment>Create listings table with foreign key to categories and indexes</comment>
+    </changeSet>
+
+    <changeSet id="02-create-listing-additional-images-table" author="Rusya235">
+        <createTable tableName="listing_additional_images">
+            <column name="listing_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="image_url" type="VARCHAR(512)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint baseTableName="listing_additional_images"
+                                 baseColumnNames="listing_id"
+                                 constraintName="fk_additional_image_listing"
+                                 referencedTableName="listings"
+                                 referencedColumnNames="id"
+                                 onDelete="CASCADE"/> <!-- Удалять доп. картинки при удалении объявления -->
+
+        <addPrimaryKey tableName="listing_additional_images"
+                       columnNames="listing_id, image_url"
+                       constraintName="pk_listing_additional_images"/>
+
+        <rollback>
+            <dropTable tableName="listing_additional_images"/>
+        </rollback>
+        <comment>Create table for additional listing images</comment>
+    </changeSet>
+
+</databaseChangeLog>

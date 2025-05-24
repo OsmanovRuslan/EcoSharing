@@ -17,6 +17,8 @@ public class NotificationRequestKafkaDto {
 
     private UUID userId;
 
+    private String recipientTelegramId;
+
     private NotificationType notificationType;
 
     private Map<String, String> params;

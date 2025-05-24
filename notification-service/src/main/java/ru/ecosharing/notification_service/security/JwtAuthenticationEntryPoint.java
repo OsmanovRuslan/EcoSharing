@@ -16,51 +16,37 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 
 /**
- * Компонент, который обрабатывает ошибки аутентификации (когда доступ запрещен из-за отсутствия
- * валидных учетных данных). Он вызывается Spring Security, когда требуется аутентификация,
- * но она не предоставлена или неверна (до этапа авторизации).
- * Формирует JSON-ответ со статусом 401 Unauthorized.
+ * Компонент для обработки ошибок аутентификации (401 Unauthorized).
+ * Формирует JSON ответ вместо стандартной страницы ошибки Spring Security.
  */
 @Slf4j
-@Component // Регистрируем как Spring бин
-@RequiredArgsConstructor // Внедряем ObjectMapper
+@Component
+@RequiredArgsConstructor
 public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
-    private final ObjectMapper objectMapper; // Для преобразования DTO в JSON
+    private final ObjectMapper objectMapper; // Для сериализации DTO в JSON
 
     /**
-     * Метод, вызываемый Spring Security при ошибке аутентификации.
-     * @param request        Запрос, вызвавший ошибку.
-     * @param response       Ответ, куда будет записана ошибка.
-     * @param authException Исключение, содержащее детали ошибки аутентификации.
-     * @throws IOException      Если произошла ошибка записи в response.
-     * @throws ServletException Если произошла ошибка сервлета.
+     * Вызывается, когда неаутентифицированный пользователь пытается получить доступ к защищенному ресурсу.
      */
     @Override
-    public void commence(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            AuthenticationException authException)
+    public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException)
             throws IOException, ServletException {
+        log.warn("Ошибка аутентификации: '{}' для запроса: {}", authException.getMessage(), request.getRequestURI());
 
-        // Логируем ошибку аутентификации
-        log.warn("Ошибка аутентификации для пути [{}]: {}", request.getRequestURI(), authException.getMessage());
-        log.debug("Детали ошибки аутентификации:", authException); // Полное исключение в debug
-
-        // Формируем стандартизированный DTO ответа об ошибке
+        // Формируем DTO с ошибкой
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .status(HttpServletResponse.SC_UNAUTHORIZED) // 401
-                .message("Ошибка аутентификации: Требуется действительный JWT токен.") // Общее сообщение
-                // .message("Ошибка аутентификации: " + authException.getMessage()) // Можно включить детали, но осторожно
-                .path(request.getRequestURI()) // Путь, где произошла ошибка
+                .message("Требуется аутентификация: " + authException.getMessage())
+                .path(request.getRequestURI())
                 .timestamp(LocalDateTime.now())
                 .build();
 
-        // Настраиваем HTTP ответ
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE); // Тип контента - JSON
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // Статус 401
+        // Устанавливаем тип контента и статус ответа
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 
-        // Записываем JSON в тело ответа с помощью ObjectMapper
+        // Записываем JSON в тело ответа
         objectMapper.writeValue(response.getOutputStream(), errorResponse);
     }
 }

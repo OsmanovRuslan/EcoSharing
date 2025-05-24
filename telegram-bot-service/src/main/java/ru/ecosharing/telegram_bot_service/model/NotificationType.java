@@ -7,7 +7,6 @@ public enum NotificationType {
 
     // Уведомления о регистрации/аккаунте
     REGISTRATION_COMPLETE,   // Регистрация успешно завершена
-    WELCOME_TELEGRAM,
     EMAIL_VERIFICATION,      // Подтверждение email
     PROFILE_UPDATE,          // Обновление профиля
 
@@ -15,10 +14,6 @@ public enum NotificationType {
     RENTAL_REQUEST,          // Новый запрос на аренду
     RENTAL_APPROVED,         // Аренда подтверждена
     RENTAL_REJECTED,         // Аренда отклонена
-    RENTAL_CANCELED,         // Аренда отменена
-    RENTAL_STARTED,          // Аренда началась
-    RENTAL_ENDING,           // Аренда скоро закончится
-    RENTAL_COMPLETED,        // Аренда завершена
 
     // Уведомления о платежах
     PAYMENT_SUCCESS,         // Успешная оплата

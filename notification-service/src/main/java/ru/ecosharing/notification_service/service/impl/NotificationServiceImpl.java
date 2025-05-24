@@ -4,23 +4,18 @@ import feign.FeignException;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.ecosharing.notification_service.client.AuthServiceClient;
 import ru.ecosharing.notification_service.client.UserServiceClient;
 import ru.ecosharing.notification_service.dto.kafka.NotificationRequestKafkaDto;
 import ru.ecosharing.notification_service.dto.UserProfileDto;
 import ru.ecosharing.notification_service.dto.UserNotificationDetailsDto;
-import ru.ecosharing.notification_service.dto.UserTelegramIdDto;
 import ru.ecosharing.notification_service.model.UserNotification;
 import ru.ecosharing.notification_service.exception.TemplateNotFoundException;
-import ru.ecosharing.notification_service.mapper.NotificationMapper;
 import ru.ecosharing.notification_service.model.enums.NotificationChannel;
 import ru.ecosharing.notification_service.model.enums.NotificationType;
 import ru.ecosharing.notification_service.repository.UserNotificationRepository;
 import ru.ecosharing.notification_service.service.NotificationService;
-import ru.ecosharing.notification_service.service.SseService;
 import ru.ecosharing.notification_service.service.TemplateService;
 import ru.ecosharing.notification_service.service.sender.Notifier;
 
@@ -35,10 +30,8 @@ import java.util.*;
 public class NotificationServiceImpl implements NotificationService {
 
     private final UserServiceClient userServiceClient;
-    private final AuthServiceClient authServiceClient;
     private final TemplateService templateService;
     private final UserNotificationRepository notificationRepository;
-    private final SseService sseService;
     private final List<Notifier> notifiers;
 
     // Карта для быстрого доступа к Notifier по каналу
@@ -80,7 +73,7 @@ public class NotificationServiceImpl implements NotificationService {
 
         // 2. Получаем telegramId (из User Service или Auth Service)
         // Используем вспомогательный метод, который инкапсулирует логику
-        String telegramId = resolveTelegramId(userId, userDetails);
+        String telegramId = request.getRecipientTelegramId();
 
         // 3. Определяем язык пользователя
         String language = Optional.ofNullable(userDetails.getLanguage())
@@ -154,9 +147,6 @@ public class NotificationServiceImpl implements NotificationService {
 
             UserNotification savedNotification = notificationRepository.save(notification);
             log.info("In-App уведомление ID {} сохранено для пользователя ID {}", savedNotification.getId(), recipient.getUserId());
-
-            // Отправляем через SSE
-            sseService.sendNotificationToUser(recipient.getUserId(), NotificationMapper.toDto(savedNotification));
 
             return savedNotification;
         } catch (TemplateNotFoundException e) {
@@ -236,57 +226,29 @@ public class NotificationServiceImpl implements NotificationService {
     private UserNotificationDetailsDto getUserDetails(UUID userId) {
         try {
             log.debug("Запрос деталей пользователя ID {} из User Service...", userId);
-            ResponseEntity<UserNotificationDetailsDto> response = userServiceClient.getUserNotificationDetails(userId);
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            // Теперь метод клиента возвращает DTO напрямую
+            UserNotificationDetailsDto userDetailsDto = userServiceClient.getUserNotificationDetails(userId); // <<< ИЗМЕНЕНИЕ ЗДЕСЬ
+
+            if (userDetailsDto != null) { // Проверяем, что DTO не null (хотя Feign обычно бросит исключение при ошибке)
                 log.debug("Успешно получены детали пользователя ID {} из User Service.", userId);
-                return response.getBody();
+                return userDetailsDto;
             } else {
-                log.warn("User Service вернул статус {} при запросе деталей уведомлений для пользователя ID {}", response.getStatusCode(), userId);
+                // Эта ветка маловероятна, если Feign не бросил исключение
+                log.warn("User Service вернул null UserNotificationDetailsDto для пользователя ID {}", userId);
                 return null;
             }
         } catch (FeignException.NotFound e) {
-            log.warn("Пользователь ID {} не найден в User Service.", userId);
+            log.warn("Пользователь ID {} не найден в User Service (404).", userId);
             return null;
-        } catch (Exception e) {
-            log.error("Ошибка при запросе деталей уведомлений пользователя ID {} из User Service: {}", userId, e.getMessage(), e);
+        } catch (FeignException e) { // Ловим другие FeignException
+            log.error("Ошибка Feign (статус {}) при запросе деталей пользователя ID {} из User Service: {}",
+                    e.status(), userId, e.getMessage(), e);
+            return null;
+        } catch (Exception e) { // Ловим любые другие неожиданные ошибки
+            log.error("Неожиданная ошибка при запросе деталей уведомлений пользователя ID {} из User Service: {}",
+                    userId, e.getMessage(), e);
             return null;
         }
     }
 
-    /**
-     * Получает Telegram ID пользователя, пытаясь сначала из данных User Service,
-     * а затем (если там null) из Auth Service.
-     * @param userId ID пользователя.
-     * @param userDetails Детали, полученные от User Service.
-     * @return Строку с Telegram ID или null, если не найден нигде.
-     */
-    private String resolveTelegramId(UUID userId, UserNotificationDetailsDto userDetails) {
-        // 1. Запрашиваем у Auth Service
-        log.debug("TelegramId отсутствует в данных User Service для ID {}, запрос в Auth Service...", userId);
-        try {
-            ResponseEntity<UserTelegramIdDto> response = authServiceClient.getTelegramIdByUserId(userId);
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                String telegramId = response.getBody().getTelegramId();
-                if (telegramId != null && !telegramId.isBlank()) {
-                    log.info("TelegramId {} получен из Auth Service для пользователя ID {}", telegramId, userId);
-                    return telegramId;
-                } else {
-                    log.debug("Auth Service не вернул telegramId для пользователя ID {}", userId);
-                    return null; // Auth Service нашел пользователя, но ID не привязан
-                }
-            } else {
-                // Ошибка от Auth Service (не 2xx)
-                log.warn("Auth Service вернул статус {} при запросе telegramId для пользователя ID {}", response.getStatusCode(), userId);
-                return null;
-            }
-        } catch (FeignException.NotFound e) {
-            // Пользователь не найден в Auth Service (маловероятно, если он есть в User Service)
-            log.warn("Пользователь ID {} не найден в Auth Service при запросе telegramId.", userId);
-            return null;
-        } catch (Exception e) {
-            // Любая другая ошибка при запросе к Auth Service
-            log.error("Ошибка при запросе telegramId пользователя ID {} из Auth Service: {}", userId, e.getMessage());
-            return null; // Возвращаем null при любой ошибке связи/обработки
-        }
-    }
 }

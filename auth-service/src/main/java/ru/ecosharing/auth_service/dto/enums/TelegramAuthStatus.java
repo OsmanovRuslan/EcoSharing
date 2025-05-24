@@ -1,4 +1,4 @@
-package ru.ecosharing.auth_service.dto.enumeration;
+package ru.ecosharing.auth_service.dto.enums;
 
 /**
  * Перечисление возможных статусов результата аутентификации через Telegram.

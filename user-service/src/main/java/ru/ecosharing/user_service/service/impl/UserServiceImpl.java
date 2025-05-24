@@ -184,7 +184,17 @@ public class UserServiceImpl implements UserService {
         return UserMapper.toUserProfileResponse(uup);
     }
 
-    // --- НОВЫЙ МЕТОД ---
+    @Override
+    @Transactional(readOnly = true) // Операция только на чтение
+    public UserNotificationDetailsDto getUserNotificationDetails(UUID userId) {
+        log.debug("Запрос данных для уведомлений пользователя ID: {}", userId);
+
+        UserProfile userProfile = findUserProfileById(userId);
+        UserSettings userSettings = findUserSettingsByUserId(userId);
+
+        return UserMapper.toUserNotificationDetailsDto(userProfile, userSettings);
+    }
+
     @Override
     @Transactional
     @PreAuthorize("hasRole('ADMIN')") // Требуем роль ADMIN для удаления

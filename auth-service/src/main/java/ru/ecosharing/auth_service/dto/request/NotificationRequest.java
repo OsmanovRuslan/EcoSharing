@@ -1,7 +1,7 @@
 package ru.ecosharing.auth_service.dto.request;
 
 import lombok.Data;
-import ru.ecosharing.auth_service.dto.enumeration.NotificationType;
+import ru.ecosharing.auth_service.dto.enums.NotificationType;
 
 import java.util.Map;
 

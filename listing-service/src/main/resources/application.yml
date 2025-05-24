@@ -1,0 +1,68 @@
+spring:
+  application:
+    name: listing-service
+
+  # --- Liquibase ---
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    enabled: true
+
+  # --- Elasticsearch ---
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+
+  # --- Kafka ---
+  kafka:
+    bootstrap-servers: localhost:9092,localhost:9094,localhost:9096
+    consumer:
+      group-id:
+        listing-events: listing-service-indexer-group # Для событий объявлений (уже есть)
+        category-events: listing-service-category-event-group # Для событий категорий (новое)
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: ru.ecosharing.*,java.util,java.lang,org.telegram.telegrambots.meta.api.objects
+        spring.json.fail.on.unknown.properties: false # Игнорировать неизвестные поля JSON
+      auto-offset-reset: earliest # Поведение при отсутствии сохраненного offset'а
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer # Сериализуем в JSON
+      acks: all
+      properties:
+        linger.ms: 0
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+
+
+# --- Kafka Topics (имена топиков) ---
+kafka:
+  topic:
+    listing-events: listing-events # Топик для событий объявлений (создание, обновление, удаление, статусы)
+    category-events: category-events # Топик для событий категорий (активация, деактивация)
+    # notification-requests: notification-requests # Если listing-service напрямую шлет запросы на уведомления
+
+server:
+  port: 0
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+jwt:
+  secret: ${JWT_SECRET}

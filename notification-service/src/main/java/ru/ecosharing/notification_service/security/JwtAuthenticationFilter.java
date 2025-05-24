@@ -6,99 +6,81 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
 /**
- * Фильтр Spring Security, который проверяет наличие и валидность JWT токена
- * в заголовке Authorization каждого входящего запроса.
- * Если токен валиден, извлекает данные аутентификации и устанавливает их
- * в SecurityContextHolder.
+ * Фильтр, который перехватывает каждый запрос, проверяет наличие JWT токена в заголовке Authorization,
+ * валидирует его и устанавливает аутентификацию пользователя в SecurityContext, если токен валиден.
  */
 @Slf4j
-// НЕ используем @Component, т.к. бин создается явно в SecurityConfig
-@RequiredArgsConstructor // Внедряем зависимости через конструктор
+@RequiredArgsConstructor // Генерирует конструктор для final поля jwtTokenProvider
+@Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider; // Провайдер для работы с JWT
 
-    private static final String AUTHORIZATION_HEADER = "Authorization"; // Имя HTTP заголовка
-    private static final String BEARER_PREFIX = "Bearer "; // Стандартный префикс для JWT
+    private static final String AUTHORIZATION_HEADER = "Authorization"; // Имя заголовка
+    private static final String BEARER_PREFIX = "Bearer "; // Префикс токена
 
     /**
-     * Основной метод фильтрации. Выполняется для каждого запроса.
-     * @param request HttpServletRequest
-     * @param response HttpServletResponse
-     * @param filterChain Цепочка фильтров
-     * @throws ServletException Если возникает ошибка сервлета.
-     * @throws IOException Если возникает ошибка ввода-вывода.
+     * Основной метод фильтра, выполняющийся для каждого запроса.
      */
     @Override
-    protected void doFilterInternal(
-            @NonNull HttpServletRequest request, // Используем @NonNull для подсказок IDE
-            @NonNull HttpServletResponse response,
-            @NonNull FilterChain filterChain)
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        final String authHeader = request.getHeader(AUTHORIZATION_HEADER);
-        final String jwt;
+        try {
+            // 1. Извлекаем токен из заголовка
+            String jwt = resolveToken(request);
 
-        // 1. Проверяем наличие заголовка и префикса Bearer
-        if (!StringUtils.hasText(authHeader) || !authHeader.startsWith(BEARER_PREFIX)) {
-            log.trace("Заголовок Authorization отсутствует или не начинается с Bearer для пути: {}", request.getRequestURI());
-            // Если заголовка нет, просто передаем управление дальше.
-            // SecurityConfig решит, нужен ли токен для этого эндпоинта.
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        // 2. Извлекаем сам токен
-        jwt = authHeader.substring(BEARER_PREFIX.length());
-
-        // 3. Получаем текущий SecurityContext (если он уже есть, например, от предыдущего фильтра)
-        // Обычно SecurityContext пуст на этом этапе для stateless приложения.
-        SecurityContext context = SecurityContextHolder.getContext();
-
-        // 4. Проверяем, что пользователь еще не аутентифицирован в текущем контексте
-        //    и токен валиден (проверяем подпись и срок действия)
-        if (context.getAuthentication() == null && jwtTokenProvider.validateToken(jwt)) {
-            log.trace("Токен валиден, попытка извлечь аутентификацию.");
-            try {
-                // 5. Если токен валиден, извлекаем из него объект Authentication
+            // 2. Проверяем, что токен есть и валиден
+            if (StringUtils.hasText(jwt) && jwtTokenProvider.validateToken(jwt)) {
+                // 3. Если токен валиден, получаем объект Authentication
                 Authentication authentication = jwtTokenProvider.getAuthentication(jwt);
-
                 if (authentication != null) {
-                    // 6. Устанавливаем извлеченный объект Authentication в SecurityContext
-                    // Теперь Spring Security знает, что пользователь аутентифицирован
-                    context.setAuthentication(authentication);
-                    SecurityContextHolder.setContext(context); // Обновляем контекст
-                    log.trace("Аутентификация для '{}' успешно установлена в SecurityContext.", authentication.getName());
+                    // 4. Устанавливаем объект Authentication в SecurityContext
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    log.trace("Установлена аутентификация для пользователя '{}' в SecurityContext.", authentication.getName());
                 } else {
-                    // Случай, когда токен валиден, но создать Authentication не удалось (редко)
                     log.warn("Не удалось создать объект Authentication из валидного токена.");
-                    SecurityContextHolder.clearContext(); // Очищаем на всякий случай
+                    // Очищаем контекст на случай, если там что-то было
+                    SecurityContextHolder.clearContext();
                 }
-            } catch (Exception e) {
-                // Ловим ошибки, которые могли возникнуть при извлечении Authentication
-                log.error("Ошибка при установке аутентификации из JWT: {}", e.getMessage(), e);
-                SecurityContextHolder.clearContext(); // Очищаем контекст при ошибке
-            }
-        } else {
-            if (context.getAuthentication() != null) {
-                log.trace("Пользователь уже аутентифицирован, пропускаем JWT фильтр.");
             } else {
-                log.trace("JWT токен не прошел валидацию.");
-                SecurityContextHolder.clearContext(); // Очищаем, если токен был, но невалиден
+                // Если токена нет или он невалиден, просто очищаем контекст
+                // SecurityConfig далее решит, разрешен ли доступ к ресурсу без аутентификации
+                SecurityContextHolder.clearContext();
+                log.trace("JWT токен отсутствует или невалиден для пути: {}", request.getRequestURI());
             }
+        } catch (Exception e) {
+            // Ловим возможные ошибки при обработке токена
+            log.error("Ошибка при обработке JWT токена: {}", e.getMessage(), e);
+            SecurityContextHolder.clearContext(); // Очищаем контекст при любой ошибке
         }
 
-        // 7. Передаем управление следующему фильтру в цепочке
+        // 5. Передаем запрос дальше по цепочке фильтров
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Извлекает JWT токен из заголовка Authorization.
+     * @param request HttpServletRequest.
+     * @return Строка токена без префикса "Bearer " или null, если токен не найден.
+     */
+    private String resolveToken(HttpServletRequest request) {
+        String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
+        // Проверяем, что заголовок есть, не пустой и начинается с "Bearer "
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(BEARER_PREFIX)) {
+            // Возвращаем сам токен (без префикса)
+            return bearerToken.substring(BEARER_PREFIX.length());
+        }
+        // Если заголовок некорректный или отсутствует
+        return null;
     }
 }
